@@ -12,6 +12,6 @@ public class FlipDotSerialStream : MonoBehaviour
         sps = new SerialPortStream("COM1", 57600, 8, Parity.None, StopBits.One);
 
         sps.Open();
-        sps.
+        //sps.
     }
 }
