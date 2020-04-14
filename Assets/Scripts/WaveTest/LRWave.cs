@@ -174,7 +174,7 @@ public class LRWave : MonoBehaviour
     private void RenderWave()
     {
         line.positionCount = samples;
-        if (superpositionPoints != null && superpositionPoints[0] != null)
+        if (superpositionPoints != null && superpositionPoints.Length == samples)
         {
             line.SetPositions(superpositionPoints);
         }

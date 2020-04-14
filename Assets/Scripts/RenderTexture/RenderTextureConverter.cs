@@ -13,14 +13,31 @@ public class RenderTextureConverter : MonoBehaviour
     public RenderTexture flipDotRT_ARGB32;
     public Texture2D flipDotTex2D_RGBA32;
 
-    private bool keyPressed;
+    public FlipDotIOSharp flipDotIOSharpClass;
 
+    private bool keyPressed;
+    [SerializeField]
+    private float updateInterval;
+    private float timer;
+
+    private void Start()
+    {
+        // flipDotIOSharpClass.connect();
+        timer = 0;
+    }
     private void Update()
     {
-        if (Input.GetKey(KeyCode.Space))
+        if (updateInterval > 0)
         {
-            keyPressed = true;
+
+            timer += Time.deltaTime;
+            if (timer >= updateInterval)
+            {
+                timer %= updateInterval;
+                keyPressed = true;
+            } 
         }
+        
     }
 
     private void OnPostRender()
@@ -29,7 +46,10 @@ public class RenderTextureConverter : MonoBehaviour
         {
             ReadToTex2D();
             var pixels = GetInt32Pixels(flipDotTex2D_RGBA32);
-            Debug.Log(pixels.Length + "Pixels");
+
+            flipDotIOSharpClass.SendImage(pixels);
+
+            //Debug.Log(pixels.Length + "Pixels");
             keyPressed = false;
         }
     }
