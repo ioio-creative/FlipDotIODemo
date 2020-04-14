@@ -13,7 +13,7 @@ public class RenderTextureConverter : MonoBehaviour
     public RenderTexture flipDotRT_ARGB32;
     public Texture2D flipDotTex2D_RGBA32;
 
-    public FlipDotIOSharp flipDotIOSharpClass;
+    public FlipDotSerialPort flipDotIOSharpClass;
 
     private bool keyPressed;
     [SerializeField]
@@ -47,7 +47,7 @@ public class RenderTextureConverter : MonoBehaviour
             ReadToTex2D();
             var pixels = GetInt32Pixels(flipDotTex2D_RGBA32);
 
-            flipDotIOSharpClass.SendImage(pixels);
+            flipDotIOSharpClass.SendFlipDotImage(pixels);
 
             //Debug.Log(pixels.Length + "Pixels");
             keyPressed = false;
