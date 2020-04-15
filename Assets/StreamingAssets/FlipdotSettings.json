@@ -1,0 +1,58 @@
+{
+  "comPort": "COM9",
+  "panels": [
+      {
+        "startX": 0,
+        "startY": 7,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 0, 
+        "startY": 0, 
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 28,
+        "startY": 7,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 28,
+        "startY": 0,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 0, 
+        "startY": 21,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 0, 
+        "startY": 14,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 28,
+        "startY": 21,
+        "width":  28,
+        "height": 7
+      },
+      {
+        "startX": 28,
+        "startY": 14,
+        "width":  28,
+        "height": 7
+      }
+  ],
+  "baudRate": 57600,
+  "parity": 0,
+  "dataBits": 8,
+  "stopBits":  1,
+  "lineStride": 56
+}

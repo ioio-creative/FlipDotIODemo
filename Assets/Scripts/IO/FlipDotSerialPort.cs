@@ -1,73 +1,72 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Threading;
+using System.IO;
 using System.IO.Ports;
 using UnityEngine;
 
+[Serializable]
+public struct PanelDimension
+{
+    public int startX;
+    public int startY;
+    public int width;
+    public int height;
+}
+
+
+// filpdot config
+[Serializable]
+public struct FlipDotSettings
+{
+    public string comPort;          // = "COM1";
+    public PanelDimension[] panels; /* = [
+                                            {
+                                               "startX": 0,
+                                               "startY": 7,
+                                               "width":  28,
+                                               "height": 7
+                                            },
+                                            ...
+                                         ]; */
+    public int baudRate;            // = 57600;
+    public Parity parity;           // = 0; // = Parity.None;
+    public int dataBits;            // = 8;
+    public StopBits stopBits;       // = 1; // = Stopbits.One;
+    public int lineStride;          // panelColCount * dotsPerRow
+}
+
 public class FlipDotSerialPort : MonoBehaviour
 {
-    public string portName;
-    
-    public SerialPort sp;
+    [SerializeField]
+    private string settingsFileName = "FlipdotSettings.json";
 
+    [SerializeField]
+    private FlipDotSettings settings;
+
+    [SerializeField]
+    private int dotsInFlipdot;
+
+    private SerialPort sp;
     private Thread sendThread;
 
-    // filpdot hardware conf.
-    // {sx, sy}, {w, h}
-    private int[,,] panels = new int[,,] {
-        { {0, 7}, {28, 7} },
-        { {0, 0}, {28, 7} },
-        { {28, 7}, {28, 7} },
-        { {28, 0}, {28, 7} },
-        { {0, 21}, {28, 7} },
-        { {0, 14}, {28, 7} },
-        { {28, 21}, {28, 7} },
-        { {28, 14}, {28, 7} },
-    };
-
-    // msg to be send
-    private byte[][] msg = new byte[][] {
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34, 62, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 42, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 42, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14,  8, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 42, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 42, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  2,  2, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 42, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        }
-    };
-
-    private void Awake()
+    private void loadSettingsFile()
     {
+        string jsonFilePath = Path.Combine(Application.streamingAssetsPath, settingsFileName);
+        string jsonString = File.ReadAllText(jsonFilePath);
+        settings = JsonUtility.FromJson<FlipDotSettings>(jsonString);
+        dotsInFlipdot = 0;
+        for (int i = 0; i < settings.panels.Length; dotsInFlipdot += settings.panels[i].width * settings.panels[i].height, i++) ;
     }
-
     private void OnEnable()
     {
+        loadSettingsFile();
         if (sp == null || !sp.IsOpen)
         {
-            sp = new SerialPort(portName, 57600, Parity.None, 8, StopBits.One);
+            sp = new SerialPort(settings.comPort, settings.baudRate, settings.parity, settings.dataBits, settings.stopBits);
             sp.Open();
         }
-        
-    }
 
+    }
     private void OnDisable()
     {
         if (sp.IsOpen)
@@ -82,30 +81,35 @@ public class FlipDotSerialPort : MonoBehaviour
         }
     }
 
-    private void Build_message(int[] fullImg)
+    private byte[][] Build_message(int[] fullImg)
     {
         // just simple check if the total data length = filpdot dots length
-        // 56 x 28 = 1568
-        // need to change later when flipdot hardware change
-        if (fullImg.Length != 1568) return;
-        for (int i = 0; i < 8; i++)
+        if (fullImg.Length != dotsInFlipdot) {
+            return new byte[0][]; // prevent null handling outside
+        }
+        // initialize the message array
+        byte[][] msg = new byte[settings.panels.Length][];
+        for (int i = 0; i < settings.panels.Length; i++)
         {
-            int xs = panels[i, 0, 0];
-            int ys = panels[i, 0, 1];
-            int w = panels[i, 1, 0];
-            int h = panels[i, 1, 1];
+            msg[i] = new byte[settings.panels[i].width];
+            PanelDimension panel = settings.panels[i];
+            int xs = panel.startX;
+            int ys = panel.startY;
+            int w = panel.width;
+            int h = panel.height;
             for (int x = xs; x < xs + w; x++)
             {
                 byte cell = 0;
                 for (int y = h - 1; y > -1; y--)
                 {
-                    byte pixel = (fullImg[x + (ys + y) * 56] == (int)0 ? (byte)0x00 : (byte)0x01);
+                    byte pixel = (fullImg[x + (ys + y) * settings.lineStride] == (int)0 ? (byte)0x00 : (byte)0x01);
                     cell = (byte)(cell << 1);
                     cell = (byte)(cell | pixel);
                 }
                 msg[i][x - xs] = cell;
             }
         }
+        return msg;
     }
 
     // format the message 
@@ -143,13 +147,12 @@ public class FlipDotSerialPort : MonoBehaviour
 
     private void SendingThread(int[] imageData)
     {
-        Build_message(imageData);
+        byte[][] msg = Build_message(imageData);
         for (int i = 0; i < msg.Length; i++)
         {
             SendToScreen((byte)(i + 1), msg[i]);
         }
     }
-
 
     public void SendFlipDotImage(int[] imageArray)
     {

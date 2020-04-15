@@ -1,71 +1,44 @@
 ﻿using System;
-using System.Timers;
-using System.Threading.Tasks;
+using System.IO;
 using System.IO.Ports;
-using System.Linq;
 using UnityEngine;
 
 public class FlipDotIOSharp : MonoBehaviour
 {
 
     [SerializeField]
-    private string COMPort;
+    private string settingsFileName = "FlipdotSettings.json";
 
-    public Timer timer;
+    private FlipDotSettings settings;
     private SerialPort sp;
 
     // msg to be send
-    private byte[][] msg = new byte[][] {
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34, 62, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 42, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 42, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14,  8, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 42, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 42, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  2,  2, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        },
-        new byte[]{
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 42, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        }
-    };
+    private byte[][] msg;
 
-    // filpdot hardware conf.
-    // {sx, sy}, {w, h}
-    private int[,,] panels = new int[,,] {
-        { {0, 7}, {28, 7} },
-        { {0, 0}, {28, 7} },
-        { {28, 7}, {28, 7} },
-        { {28, 0}, {28, 7} },
-        { {0, 21}, {28, 7} },
-        { {0, 14}, {28, 7} },
-        { {28, 21}, {28, 7} },
-        { {28, 14}, {28, 7} },
-    };
+    private int dotsPerFlipdot = 0;
 
     private void Awake()
     {
+        loadSettingsFile();
         connect();
     }
-
+    private void loadSettingsFile()
+    {
+        string jsonFilePath = Path.Combine(Application.streamingAssetsPath, settingsFileName);
+        string jsonString = File.ReadAllText(jsonFilePath);
+        settings = JsonUtility.FromJson<FlipDotSettings>(jsonString);
+        
+        // initialize the message array
+        msg = new byte[settings.panels.Length][];
+        for (int i = 0; i < settings.panels.Length; i++)
+        {
+            dotsPerFlipdot += settings.panels[i].width * settings.panels[i].height;
+            msg[i] = new byte[settings.panels[i].width];
+        }
+    }
     public void connect()
     {
-        //string[] ports = SerialPort.GetPortNames();
-        //Debug.Log(ports);
-
-        sp = new SerialPort(COMPort, 57600, Parity.None, 8, StopBits.One);
+        sp = new SerialPort(settings.comPort, settings.baudRate, settings.parity, settings.dataBits, settings.stopBits);
         sp.Open();
     }
 
@@ -89,13 +62,14 @@ public class FlipDotIOSharp : MonoBehaviour
         // just simple check if the total data length = filpdot dots length
         // 56 x 28 = 1568
         // need to change later when flipdot hardware change
-        if (fullImg.Length != 1568) return;
-        for (int i = 0; i < 8; i++)
+        if (fullImg.Length != dotsPerFlipdot) return;
+        for (int i = 0; i < settings.panels.Length; i++)
         {
-            int xs = panels[i, 0, 0];
-            int ys = panels[i, 0, 1];
-            int w = panels[i, 1, 0];
-            int h = panels[i, 1, 1];
+            PanelDimension panel = settings.panels[i];
+            int xs = panel.startX; // panels[i][0];
+            int ys = panel.startY; // panels[i][1];
+            int w = panel.width;   // panels[i][2];
+            int h = panel.height;  // panels[i][3];
             for (int x = xs; x < xs + w; x++)
             {
                 byte cell = 0;
